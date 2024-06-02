@@ -2,6 +2,7 @@ package com.example
 
 // import io.ktor.features.*
 import com.example.plugins.*
+import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.serialization.*
 import io.ktor.serialization.kotlinx.json.json
@@ -12,6 +13,11 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -32,74 +38,6 @@ fun Application.module() {
     configureRouting()
 }
 
-@Serializable
-data class User(
-    val id : Int,
-    val name : String,
-    val password: String,
-    val telegram  : String?,
-    val confirmed: Boolean,
-    val is_admin: Boolean,
-    val is_ishtar: Boolean
-) {
-    constructor(_name:String, _password:String) :
-            this(0, _name, _password, null, false, false, false)
-}
-
-object DatabaseFactory {
-    fun init() {
-        val database =
-            Database.connect(
-                url = "jdbc:postgresql://localhost:5432/bablosis_db",
-                driver = "org.postgresql.Driver",
-                user = "ckaf",
-                password = "",
-            )
-    }
-    suspend fun <T> dbQuery(block: suspend () -> T): T =
-        newSuspendedTransaction(Dispatchers.IO) { block() }
-}
-
-object Users : Table() {
-    val id = long("id").autoIncrement("users_id_seq").uniqueIndex()
-    val name = text("name")
-    val password = text("password")
-    val telegram = text("telegram").nullable()
-    val confirmed = bool("confirmed").default(false)
-    val isAdmin = bool("is_admin").default(false)
-    val isIshtar = bool("is_ishtar").default(false)
-}
-
-suspend fun addUser(user: User) {
-    DatabaseFactory.dbQuery {
-        Users.insert {
-            it[name] = user.name
-            it[password] = user.password
-            it[telegram] = user.telegram
-            it[confirmed] = user.confirmed
-            it[isAdmin] = user.is_admin
-            it[isIshtar] = user.is_ishtar
-        }
-    }
-}
-
-suspend fun userExists(userName: String): Boolean {
-    return DatabaseFactory.dbQuery {
-        Users.select { Users.name eq userName }
-            .count() > 0
-    }
-}
-
-suspend fun isValidUser(userName: String, password: String): Boolean {
-    return DatabaseFactory.dbQuery {
-        val user = Users.select { Users.name eq userName }.singleOrNull()
-        user?.let {
-            it[Users.password] == password
-        } ?: false
-    }
-}
-
-@Serializable data class LoginData(val username: String, val password: String)
 
 fun Application.configureSerialization() {
     install(ContentNegotiation) { json() }
@@ -107,39 +45,82 @@ fun Application.configureSerialization() {
 
 fun Application.configureRouting() {
     val logger = LoggerFactory.getLogger("Application")
+    val tf = TokenFactory()
 
     routing {
         post("/login") {
-            logger.info("GET SOME RESPONSE")
             val loginData = call.receive<LoginData>()
-            val username = loginData.username
-            val password = loginData.password
-
-            // Пример простой проверки
-            if (isValidUser(username, password)) {
-                logger.info("Authorization successful for user: $username")
-                call.respondText("Some token")
+            var code = HttpStatusCode.Conflict
+            var jsonResponse = ""
+                if (isValidUser(loginData.username, loginData.password)) {
+                logger.info("Authorization successful for user: $loginData.username")
+                call.respondText(tf.genToken(loginData.username))
+                    code = HttpStatusCode.OK
             } else {
-                logger.info("Authorization failed for user: $username")
-                call.respondText("Authorization failed!")
+                logger.info("Authorization failed for user: $loginData.username")
+                jsonResponse = buildJsonObject {
+                    put("error", "Authorization failed!")
+                }.toString()
             }
+            call.respond(code, jsonResponse)
         }
 
         post("/registration") {
 
             val loginData = call.receive<LoginData>()
-            val username = loginData.username
-            val password = loginData.password
+            var code = HttpStatusCode.Conflict
+            var jsonResponse = ""
 
-            if (userExists(username)) {
-                call.respondText("This user already exists!")
+            if (userExists(loginData.username)) {
+                jsonResponse = buildJsonObject {
+                    put("error", "This user already exists!")
+                }.toString()
             } else {
-                logger.info("New user registered: $username")
-                val user = User(username, password)
+                logger.info("New user registered: $loginData.username")
+                val user = User(loginData.username, loginData.password)
                 addUser(user)
-                call.respondText("Some token")
+                code = HttpStatusCode.OK
             }
+            call.respond(code, jsonResponse)
         }
+
+        post ("/set_role") {
+            val roleSetData = call.receive<RoleSetData>()
+            var code = HttpStatusCode.Forbidden
+            var jsonResponse = ""
+            if (tf.hasAccess(roleSetData.accessToken, TokenFactory.roles_enum.ADMIN)){
+                confirmUser(roleSetData.username)
+                if ( TokenFactory.roles_enum.ADMIN == TokenFactory.roles_enum.valueOf(roleSetData.role)) setAdmin(roleSetData.username)
+                else if ( TokenFactory.roles_enum.ISHTAR == TokenFactory.roles_enum.valueOf(roleSetData.role)) setIshtar(roleSetData.username)
+
+                logger.info("Role set for user: ${roleSetData.username}")
+                code = HttpStatusCode.OK
+            }
+            else{
+                jsonResponse = buildJsonObject {
+                    put("error", "Insufficient rights for this operation!")
+                }.toString()
+            }
+            call.respond(code, jsonResponse)
+        }
+        post("/add_tg") {
+            var code = HttpStatusCode.Forbidden
+            var jsonResponse = ""
+            val bindData = call.receive<TgBindData>()
+            if(tf.hasAccess(bindData.accessToken, TokenFactory.roles_enum.USER)) {
+                setTelegram(tf.getUsernameFromToken(bindData.accessToken), bindData.tg)
+
+                logger.info("Telegram token set for user: ${tf.getUsernameFromToken(bindData.accessToken)}")
+                code = HttpStatusCode.OK
+            }
+            else{
+                jsonResponse = buildJsonObject {
+                    put("error", "Insufficient rights for this operation!")
+                }.toString()
+            }
+            call.respond(code, jsonResponse)
+        }
+
 
         get("/hello") { call.respondText("Hello world!") }
     }

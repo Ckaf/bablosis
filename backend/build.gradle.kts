@@ -42,6 +42,11 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:$logback_version")
     implementation("io.ktor:ktor-server-config-yaml:2.3.11")
     testImplementation("io.ktor:ktor-server-tests-jvm")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version") 
-
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
+    implementation("io.ktor:ktor-server-auth:$ktor_version")
+    implementation("io.ktor:ktor-server-auth-jwt:$ktor_version")
+    implementation ("io.jsonwebtoken:jjwt-api:0.11.2")
+    implementation ("io.jsonwebtoken:jjwt-impl:0.11.2")
+    implementation ("io.jsonwebtoken:jjwt-jackson:0.11.2")
+    implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.1.0")
 }
