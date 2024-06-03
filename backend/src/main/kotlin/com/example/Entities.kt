@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class User(
-    val id : Int,
+    val id : Long,
     val name : String,
     val password: String,
     val telegram  : String?,
@@ -16,3 +16,5 @@ data class User(
             this(0, _name, _password, null, false, false, false)
 }
 
+data class Channel(val id: Long, val name: String)
+data class ChannelBot(val id: Long, val channelId: Long, val userId: Long)

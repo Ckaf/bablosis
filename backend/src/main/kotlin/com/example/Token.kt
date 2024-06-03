@@ -3,6 +3,9 @@ package com.example
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.SignatureAlgorithm
+import io.jsonwebtoken.io.Decoders
+import io.jsonwebtoken.security.Keys
+import java.security.Key
 import java.util.*
 
 typealias Token = String;
@@ -16,11 +19,15 @@ class TokenFactory(){
         NONE("ROLE_NONE")
     }
   //  private val roles = listOf("ROLE_USER", "ROLE_ADMIN, ROLE_ISHTAR")
-    private val secretKey:String = "babloisis_secret"
+    private val secretKey:String = "babloisissecretdjfnv1231234124123dknfkvdjfvnskjdfnvkjsdnfv"
     private val validityAccess: Long = 3600000 // 1 час
     private val validityRefresh: Long = 259200000 // 3 дня
 
    // val mutableMap: MutableMap<Token, String> = mutableMapOf()
+     private fun getSigningKey() : Key {
+        val keyBytes = Decoders.BASE64.decode(secretKey);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
 
     fun genToken(username:String): Token {
         val claims = Jwts.claims().setSubject(username)
@@ -28,7 +35,7 @@ class TokenFactory(){
 
         val now = Date()
         val validity = Date(now.time + validityAccess)
-
+       // val key = Keys.secretKeyFor(SignatureAlgorithm.HS256)
         return Jwts.builder()
             .setClaims(claims)
             .setIssuedAt(now)
@@ -38,7 +45,7 @@ class TokenFactory(){
     }
 
     fun getUsernameFromToken(token: Token): String {
-            val claims: Claims = Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).body
+            val claims: Claims = Jwts.parser().setSigningKey(getSigningKey()).parseClaimsJws(token).body
             return  claims.subject
     }
 
@@ -47,6 +54,7 @@ class TokenFactory(){
             val claims: Claims = Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).body
             claims["roles"] as? roles_enum
         } catch (e: Exception) {
+            println(e)
             null
         }
     }

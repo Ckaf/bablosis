@@ -46,6 +46,7 @@ fun Application.configureSerialization() {
 fun Application.configureRouting() {
     val logger = LoggerFactory.getLogger("Application")
     val tf = TokenFactory()
+    val tbf = TelegramBotFactory()
 
     routing {
         post("/login") {
@@ -122,6 +123,9 @@ fun Application.configureRouting() {
         }
 
 
-        get("/hello") { call.respondText("Hello world!") }
+        get("/hello") {
+            //tbf.addBotToChannel("7210747693:AAH_gkDL3Q328zer5JmxQ_O4j01hQGBu6s4", "glam_disc")
+            call.respondText("Hello world!")
+        }
     }
 }
