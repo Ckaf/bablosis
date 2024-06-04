@@ -124,7 +124,6 @@ fun Application.configureRouting() {
 
 
         get("/hello") {
-            //tbf.addBotToChannel("7210747693:AAH_gkDL3Q328zer5JmxQ_O4j01hQGBu6s4", "glam_disc")
             call.respondText("Hello world!")
         }
     }
