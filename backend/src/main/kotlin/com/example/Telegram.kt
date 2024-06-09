@@ -1,21 +1,33 @@
 package com.example
 
-import kotlinx.coroutines.runBlocking
-
 
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.bot
 import com.github.kotlintelegrambot.dispatch
 import com.github.kotlintelegrambot.dispatcher.text
-import com.github.kotlintelegrambot.entities.ChatId
-import com.github.kotlintelegrambot.entities.ChatMember
-import com.github.kotlintelegrambot.entities.ChatPermissions
+import com.github.kotlintelegrambot.entities.*
 import com.github.kotlintelegrambot.entities.User
 import com.github.kotlintelegrambot.network.fold
+
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.client.plugins.*
+import io.ktor.client.plugins.contentnegotiation.*
+
+import kotlinx.coroutines.*
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
+import kotlinx.serialization.json.*
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.*
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+
 
 
 class TelegramBotFactory(){
@@ -56,6 +68,155 @@ class TelegramBotFactory(){
         }
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
+    suspend fun postMessageToChannel(email: String, channelName: String, message: String, date: LocalDateTime): Boolean {
+        val botToken = getTelegram(email) ?: return false
+        // val deferredMessageId = CompletableDeferred<Long?>()
+        val bot = bot {
+            token = botToken
+        }
+
+        val chatId = ChatId.fromChannelUsername(channelName)
+
+        // Вычисляем задержку до указанного времени
+        val now = Clock.System.now()
+        val targetTime = date.toInstant(TimeZone.currentSystemDefault())
+        val delayMillis = targetTime.toEpochMilliseconds() - now.toEpochMilliseconds()
+
+        // Проверяем, что задержка положительная
+        if (delayMillis <= 0) {
+            println("Specified time is in the past. Message will not be sent.")
+            return false
+        }
+
+        GlobalScope.launch {
+            delay(delayMillis)
+            val result = bot.sendMessage(chatId, message)
+
+            result.fold(
+                ifSuccess = {  message ->
+                    println("Message successfully sent to channel")
+                    addPost(email, channelName, message.messageId)
+                   // deferredMessageId.complete(message.messageId)
+                },
+                ifError = {
+                    println("Error sending message to channel: $it")
+                }
+            )
+        }
+
+        return true
+    }
+
+    fun getChannelId(botToken: String, channelUsername: String): Long? {
+        val bot = bot {
+            token = botToken
+        }
+
+        var chatId: Long? = null
+
+        runBlocking {
+            val result = bot.getChat(ChatId.fromChannelUsername(channelUsername))
+
+            result.fold(
+                ifSuccess = { chat ->
+                    chatId = chat.id
+                },
+                ifError = { error ->
+                    println("Error fetching chat info: $error")
+                }
+            )
+        }
+
+        return chatId
+    }
+
+    fun getBotId(botToken: String): Long? {
+        val bot = bot {
+            token = botToken
+        }
+
+        return runBlocking {
+            val me = bot.getMe().getOrNull()
+            me?.id
+        }
+    }
+
+//    fun getMessages(channel: String, messageId: Int, limit: Int, token: String): List<String> {
+//        val url = "https://api.telegram.org/bot$token/channels.getMessages?channel=$channel&limit=$limit&message_id=$messageId"
+//        val client = HttpClient()
+//        val response = get(url)
+//        if (response.statusCode == 200) {
+//            val messages = response.jsonObject.getJSONArray("result")
+//            return messages.toList().map { it.toString() }
+//        } else {
+//            throw Exception("Failed to fetch messages. Status code: ${response.statusCode}")
+//        }
+//    }
+
+    private val client = HttpClient {
+        install(ContentNegotiation) {
+          json(Json { ignoreUnknownKeys = true })
+        }
+    }
+
+
+    fun getMessageFromChannel(email: String, channelUsername: String, messageId: Long): Message? {
+        return runBlocking {
+            val botToken = getTelegram(email) ?: return@runBlocking null
+            val chatId = getChannelId(botToken, channelUsername) ?: return@runBlocking null
+
+            val response= client.get("https://api.telegram.org/bot$botToken/getMessages") {
+                parameter("channel", chatId)
+                parameter("id", messageId)
+            }
+
+            if (response.status.value == 200) {
+                val getMessageResponse: GetMessageResponse = response.body()
+                if (getMessageResponse.ok) {
+                    return@runBlocking getMessageResponse.result
+                }
+            }
+            null
+        }
+    }
+
+//    fun getPosts(botToken: String, channelUsername: String): List<Message> {
+//        val channelId = getChannelId(botToken, channelUsername)
+//        val bot = bot {
+//            token = botToken
+//        }
+//        val botId = getBotId(botToken) ?: return emptyList()
+//        val messages = mutableListOf<Message>()
+//
+//        runBlocking {
+//            var offset: Long? = 0
+//            var shouldContinue = true
+//            while (shouldContinue) {
+//                val result = bot.getUpdates(offset = offset, limit = 100)
+//
+//                result.fold(
+//                    ifSuccess = { updates ->
+//                        val botMessages = updates.mapNotNull { it.message }
+//                     //       .filter { it.chat.id == channelId && it.from?.id == botId }
+//                        messages.addAll(botMessages)
+//
+//                        if (updates.isEmpty()) {
+//                            shouldContinue = false
+//                        } else {
+//                            offset = updates.last().updateId + 1
+//                        }
+//                    },
+//                    ifError = { error ->
+//                        println("Error fetching updates: $error")
+//                        shouldContinue = false
+//                    }
+//                )
+//            }
+//        }
+//
+//        return messages
+//    }
 
 //    fun addBotToChannel(botToken: String, channelId: String): Boolean {
 //        val chatId = ChatId.fromId(channelId.toLong())

@@ -34,6 +34,7 @@ dependencies {
     implementation("io.ktor:ktor-server-core-jvm")
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm")
     implementation("io.ktor:ktor-server-content-negotiation-jvm")
+    implementation("io.ktor:ktor-client-content-negotiation-jvm")
     implementation("org.postgresql:postgresql:42.5.1")
     implementation("com.h2database:h2:2.1.214")
     implementation("io.ktor:ktor-server-metrics-jvm")
@@ -51,4 +52,7 @@ dependencies {
     implementation ("io.jsonwebtoken:jjwt-jackson:0.11.2")
 
     implementation("com.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.1.0")
+
+    implementation ("org.jetbrains.kotlinx:kotlinx-datetime:0.3.2")
+    implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 }
