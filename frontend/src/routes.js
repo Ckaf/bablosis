@@ -1,6 +1,14 @@
 import React from "react";
 import {Navigate, Route, Routes} from 'react-router-dom'
-import {AuthPage, CataclysmPage, MachinePage, TasksManagementPage, TasksPage, UsersPage} from "./pages";
+import {
+	AuthPage,
+	CataclysmPage,
+	MachinePage,
+	RegistrationPage,
+	TasksManagementPage,
+	TasksPage,
+	UsersPage
+} from "./pages";
 
 
 export const useRoutes = (userData) => {
@@ -9,6 +17,7 @@ export const useRoutes = (userData) => {
 		return (
 			<Routes>
 				<Route path="/auth" element={<AuthPage/>}/>
+				<Route path="/sign-up" element={<RegistrationPage/>}/>
 				<Route path="*" element={<Navigate to="/auth" replace/>}/>
 			</Routes>
 		)
@@ -17,6 +26,7 @@ export const useRoutes = (userData) => {
 	return (
 		<Routes>
 			<Route path="/auth" element={<AuthPage/>}/>
+			<Route path="/sign-up" element={<RegistrationPage/>}/>
 			<Route path="*" element={<Navigate to="/auth" replace/>}/>
 		</Routes>
 	)

@@ -19,7 +19,7 @@ import {Box, Button, CssBaseline, FormControl, FormLabel, Input, Link, Sheet, Ty
 import * as React from 'react';
 import {useColorScheme} from '@mui/joy/styles';
 
-export const AuthPage = () => {
+export const RegistrationPage = () => {
 
 	const navigate = useNavigate()
 	const {request} = useHttp()
@@ -27,6 +27,7 @@ export const AuthPage = () => {
 
 	const {handleSubmit, control, reset} = useForm({
 		defaultValues: {
+			username: '',
 			email: '',
 			password: ''
 		}
@@ -34,26 +35,27 @@ export const AuthPage = () => {
 
 	const onSubmit = async data => {
 		console.log(data)
-		request('/login', 'POST', data, false).then((userData) => {
+		request('/registration', 'POST', data, false).then((userData) => {
+			toast('Заявка на регистрацию отправлена')
 			// login(userData)
-			login({
-				accessToken: "string",
-				user: {
-					"id": 1,
-					"email": "email@email.com",
-					"name": "Максим",
-					"role": {
-						"id": 7,
-						"name": "Разработчик"
-					}
-				}
-			})
+			// 	login({
+			// 		accessToken: "string",
+			// 		accessToken: "string",
+			// 		user: {
+			// 			"id": 1,
+			// 			"login": "test_login",
+			// 			"name": "Максим",
+			// 			"role": {
+			// 				"id": 7,
+			// 				"name": "Разработчик"
+			// 			}
+			// 		}
+			// 	})
 		})
 	}
 
 	return (
-		<Box component="main"
-		     sx={{display: "flex", alignItems: "center", justifyContent: "center", height: '100vh', width: '100%'}}>
+		<Box component="main" sx={{display: "flex", alignItems: "center", justifyContent: "center", height: '100vh', width: '100%'}}>
 			<CssBaseline/>
 			<Sheet
 				sx={{
@@ -76,6 +78,23 @@ export const AuthPage = () => {
 					</Typography>
 				</div>
 				<Box component="form" display="flex" flexDirection="column" gap={2} onSubmit={handleSubmit(onSubmit)}>
+					<Controller
+						name={"username"}
+						required
+						fullWidth
+						control={control}
+						render={({field: {onChange, value}}) => (
+							<FormControl>
+								<FormLabel>Имя</FormLabel>
+								<Input
+									name="username"
+									onChange={onChange}
+									value={value}
+									placeholder="Username"
+								/>
+							</FormControl>
+						)}
+					/>
 					<Controller
 						name={"email"}
 						required
@@ -113,9 +132,7 @@ export const AuthPage = () => {
 							</FormControl>
 						)}
 					/>
-					<Button variant="soft" sx={{mt: 1}} type="submit">Дегустировать кровь</Button>
-					<Typography level="body-sm">Не зарегистрирован? <Link href={'/sign-up'}>Пройди
-						посвящение</Link></Typography>
+					<Button variant="soft" sx={{mt: 1 }} type="submit">Пройти посвящение</Button>
 				</Box>
 			</Sheet>
 		</Box>

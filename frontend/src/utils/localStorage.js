@@ -5,7 +5,7 @@ export const setUserDataInLocalStorage = (data) => {
 }
 
 export const getUserDataFromLocalStorage = () => {
-	const data = JSON.parse(localStorage.getItem(STORAGE_NAME))
+	const data = JSON.parse(localStorage.getItem(STORAGE_NAME) || null)
 	// console.log(data)
 	return data
 }
