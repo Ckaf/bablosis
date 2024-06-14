@@ -2,7 +2,7 @@ package com.example
 
 import kotlinx.datetime.LocalDateTime
 import kotlinx.serialization.Serializable
-
+import okhttp3.Address
 
 
 @Serializable
@@ -23,6 +23,14 @@ data class AccessTokenData(val accessToken: Token)
 @Serializable
 data class PostData(val accessToken: Token, val channelId:String, val msg: String,  val date: LocalDateTime)
 
+@Serializable
+data class OrderCreateData(val accessToken: Token, val bablos: Int, val address: String)
+
+@Serializable
+data class OrderData(val accessToken: Token, val orderId:Long, val status: status_enum?)
+
+@Serializable
+data class BablosData(val accessToken: Token, val bablos: Int)
 
 @Serializable
 data class Chat(val id: Long)
