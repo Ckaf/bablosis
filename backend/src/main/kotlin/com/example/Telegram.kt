@@ -181,6 +181,8 @@ class TelegramBotFactory(){
         }
     }
 
+
+
 //    fun getPosts(botToken: String, channelUsername: String): List<Message> {
 //        val channelId = getChannelId(botToken, channelUsername)
 //        val bot = bot {

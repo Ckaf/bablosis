@@ -50,6 +50,7 @@ dependencies {
     implementation ("io.jsonwebtoken:jjwt-api:0.11.2")
     implementation ("io.jsonwebtoken:jjwt-impl:0.11.2")
     implementation ("io.jsonwebtoken:jjwt-jackson:0.11.2")
+    implementation("com.github.badoualy:kotlogram:1.0.0-RC3")
 
     implementation("com.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.1.0")
 
