@@ -21,3 +21,30 @@ data class User(
 data class Channel(val id: Long, val name: String)
 data class ChannelBot(val id: Long, val channelId: Long, val userId: Long)
 data class Post(val id: Long, val postTgId: Long, val channelsBotsId: Long)
+
+
+@Serializable
+data class Order(
+    val id: Long,
+    val idUser: Long,
+    val idCourier: Long?,
+    val address: String,
+    val bablos: Double,
+    val status: status_enum,
+) {
+    constructor(_id:Long, _idUser:Long, _address:String, _bablos:Double) :
+            this(_id, _idUser, null, _address,_bablos, status_enum.NONE)
+}
+
+enum class status_enum(val status: String){
+    NONE("NONE"),
+    ASSEMBLY("ASSEMBLY"),
+    DELIVERY("DELIVERY"),
+    DONE("DONE");
+
+    companion object {
+        fun fromValue(value: String): status_enum? {
+            return entries.find { it.status == value }
+        }
+    }
+}

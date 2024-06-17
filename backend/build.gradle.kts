@@ -6,9 +6,9 @@ val postgresql_driver_version: String by project
 val exposed_version: String by project
 
 plugins {
-    kotlin("jvm") version "1.9.24"
+    kotlin("jvm") version "2.0.0"
     id("io.ktor.plugin") version "2.3.11"
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.24"
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.0.0"
 }
 
 group = "com.example"
@@ -18,9 +18,10 @@ application {
     mainClass.set("io.ktor.server.netty.EngineMain")
 
     val isDevelopment: Boolean = project.ext.has("development")
-    applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
+    applicationDefaultJvmArgs = listOf(
+ //       "-Djava.library.path=${projectDir}/src/main/resources/native",
+        "-Dio.ktor.development=$isDevelopment")
 }
-
 repositories {
     mavenCentral()
     maven { url = uri("https://jitpack.io") }
@@ -49,10 +50,15 @@ dependencies {
     implementation("io.ktor:ktor-server-auth-jwt:$ktor_version")
     implementation ("io.jsonwebtoken:jjwt-api:0.11.2")
     implementation ("io.jsonwebtoken:jjwt-impl:0.11.2")
+    implementation("io.ktor:ktor-server-cors:$ktor_version")
     implementation ("io.jsonwebtoken:jjwt-jackson:0.11.2")
+   // implementation("com.github.badoualy:kotlogram:1.0.0-RC3")
+    implementation("commons-io:commons-io:2.5")
+    // Добавление зависимостей Retrofit
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
 
     implementation("com.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.1.0")
-
     implementation ("org.jetbrains.kotlinx:kotlinx-datetime:0.3.2")
     implementation("io.ktor:ktor-client-okhttp:$ktor_version")
 }

@@ -1,6 +1,7 @@
 package com.example
 
 import kotlinx.coroutines.Dispatchers
+import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.dao.id.LongIdTable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
@@ -9,10 +10,11 @@ object DatabaseFactory {
     fun init() {
         val database =
             Database.connect(
-                url = "jdbc:postgresql://localhost:5432/bablosis_db",
-                driver = "org.postgresql.Driver",
-                user = "ckaf",
-                password = "",
+
+               url = "jdbc:postgresql://localhost/bablosis_db",
+                driver = "org.h2.Driver",
+                user = "postgres",
+                password = "postgres",
             )
     }
     suspend fun <T> dbQuery(block: suspend () -> T): T =
@@ -43,6 +45,143 @@ object Posts : LongIdTable() {
     val postTgId = long("post_tg_id")
     val channelsBotsId = reference("id_channelsbots", ChannelsBots)
 }
+
+object Balance : Table(){
+    val bablos = double("bablosis")
+    val user_id = reference("user_id", Users)
+}
+
+suspend fun initBalance(userId: Long) {
+    DatabaseFactory.dbQuery {
+        Balance.insert {
+            it[user_id] = EntityID(userId, Users)
+            it[bablos] = 0.0
+        }
+    }
+}
+
+suspend fun getBalance(userId: Long): Double? {
+    return DatabaseFactory.dbQuery {
+        val user = Balance.select { Balance.user_id eq userId }.singleOrNull()
+        user?.get(Balance.bablos)
+    }
+}
+
+suspend fun changeBalanceToUser(userId: Long, amount: Double) :Boolean{
+    if (amount < 0 && (getBalance(userId)!! < -amount))return false
+
+    DatabaseFactory.dbQuery {
+        Balance.update({ Balance.user_id eq userId }) {
+            with(SqlExpressionBuilder) {
+                it.update(bablos, bablos + amount)
+            }
+        }
+    }
+    return true
+}
+
+
+object Orders : LongIdTable() {
+    val id_user = reference("id_user", Users)
+    val id_courier = reference("id_courier", Users).nullable()
+    val address = text("address")
+    val bablos = double("bablos")
+    val status = text("status")
+}
+
+suspend fun addOrder(userId: Long, courierId: Long?, address: String, bablos: Double, status: String) {
+    DatabaseFactory.dbQuery {
+        Orders.insert {
+            it[id_user] = userId
+            it[id_courier] = courierId
+            it[Orders.address] = address
+            it[Orders.bablos] = bablos
+            it[Orders.status] = status
+        }
+    }
+}
+
+suspend fun getOrdersByCourierId(courierId: Long): List<Order> {
+    return DatabaseFactory.dbQuery {
+        Orders.select {
+            Orders.id_courier eq courierId
+        }.map { row ->
+            Order(
+                id = row[Orders.id].value,
+                idUser = row[Orders.id_user].value,
+                idCourier = row[Orders.id_courier]?.value,
+                address = row[Orders.address],
+                bablos = row[Orders.bablos],
+                status = status_enum.valueOf(row[Orders.status])
+            )
+        }
+    }
+}
+
+
+
+suspend fun getOrdersByUserId(userId: Long): List<Order> {
+    return DatabaseFactory.dbQuery {
+        Orders.select {
+            Orders.id_user eq userId
+        }.map { row ->
+            Order(
+                id = row[Orders.id].value,
+                idUser = row[Orders.id_user].value,
+                idCourier = row[Orders.id_courier]?.value,
+                address = row[Orders.address],
+                bablos = row[Orders.bablos],
+                status = status_enum.valueOf(row[Orders.status])
+            )
+        }
+    }
+}
+
+
+suspend fun getFreeOrders(): List<Order> {
+    return DatabaseFactory.dbQuery {
+        Orders.select {
+            Orders.id_courier.isNull()
+        }.map { row ->
+            Order(
+                id = row[Orders.id].value,
+                idUser = row[Orders.id_user].value,
+                idCourier = null,
+                address = row[Orders.address],
+                bablos = row[Orders.bablos],
+                status = status_enum.valueOf(row[Orders.status])
+            )
+        }
+    }
+}
+
+suspend fun updateOrderCourier(orderId:Long, courierId:Long ){
+    DatabaseFactory.dbQuery {
+        Orders.update({ Orders.id eq orderId }) {
+            it[id_courier] = courierId
+        }
+    }
+}
+
+suspend fun getOrderStatus(orderId: Long): status_enum? {
+    return DatabaseFactory.dbQuery {
+        Orders.select { Orders.id eq orderId }
+            .mapNotNull { row ->
+                status_enum.fromValue(row[Orders.status])
+            }
+            .singleOrNull()
+    }
+}
+
+suspend fun updateOrderStatus(orderId: Long, newStatus: status_enum) {
+    DatabaseFactory.dbQuery {
+        Orders.update({ Orders.id eq orderId }) {
+            it[status] = newStatus.status
+        }
+    }
+}
+
+
 
 suspend fun addUser(user: User) {
     DatabaseFactory.dbQuery {
@@ -115,7 +254,7 @@ suspend fun isUserIshtar(email: String): Boolean {
 suspend fun confirmUser(email: String): Boolean {
     return DatabaseFactory.dbQuery {
         val updatedRows = Users.update({ Users.email eq email }) {
-            it[Users.confirmed] = true
+            it[confirmed] = true
         }
         updatedRows > 0
     }
@@ -124,7 +263,7 @@ suspend fun confirmUser(email: String): Boolean {
 suspend fun setAdmin(email: String): Boolean {
     return DatabaseFactory.dbQuery {
         val updatedRows = Users.update({ Users.email eq email }) {
-            it[Users.isAdmin] = true
+            it[isAdmin] = true
         }
         updatedRows > 0
     }
@@ -132,7 +271,7 @@ suspend fun setAdmin(email: String): Boolean {
 suspend fun setIshtar(email: String): Boolean {
     return DatabaseFactory.dbQuery {
         val updatedRows = Users.update({ Users.email eq email }) {
-            it[Users.isIshtar] = true
+            it[isIshtar] = true
         }
         updatedRows > 0
     }
@@ -141,7 +280,7 @@ suspend fun setIshtar(email: String): Boolean {
 suspend fun setCourier(email: String): Boolean {
     return DatabaseFactory.dbQuery {
         val updatedRows = Users.update({ Users.email eq email }) {
-            it[Users.isCourier] = true
+            it[isCourier] = true
         }
         updatedRows > 0
     }
@@ -150,9 +289,16 @@ suspend fun setCourier(email: String): Boolean {
 suspend fun setTelegram(email: String, tgToken:String): Boolean {
     return DatabaseFactory.dbQuery {
         val updatedRows = Users.update({ Users.email eq email }) {
-            it[Users.telegram] = tgToken
+            it[telegram] = tgToken
         }
         updatedRows > 0
+    }
+}
+
+suspend fun getId(email: String): EntityID<Long>? {
+    return DatabaseFactory.dbQuery {
+        val user = Users.select { Users.email eq email }.singleOrNull()
+        user?.get(Users.id)
     }
 }
 
@@ -160,6 +306,13 @@ suspend fun getTelegram(email: String): String? {
     return DatabaseFactory.dbQuery {
         val user = Users.select { Users.email eq email }.singleOrNull()
         user?.get(Users.telegram)
+    }
+}
+
+suspend fun getName(email: String): String? {
+    return DatabaseFactory.dbQuery {
+        val user = Users.select { Users.email eq email }.singleOrNull()
+        user?.get(Users.name)
     }
 }
 
