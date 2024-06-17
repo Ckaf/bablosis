@@ -10,8 +10,8 @@ object DatabaseFactory {
     fun init() {
         val database =
             Database.connect(
-                url = "jdbc:postgresql://80.78.242.22:5432/bablosis",
-               //url = "jdbc:postgresql://localhost/bablosis_db",
+
+               url = "jdbc:postgresql://localhost/bablosis_db",
                 driver = "org.h2.Driver",
                 user = "postgres",
                 password = "postgres",
