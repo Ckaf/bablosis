@@ -25,14 +25,14 @@ data class Post(val id: Long, val postTgId: Long, val channelsBotsId: Long)
 
 @Serializable
 data class Order(
-    val id : Long,
-    val idUser : Long,
+    val id: Long,
+    val idUser: Long,
     val idCourier: Long?,
     val address: String,
-    val bablos  : Int,
+    val bablos: Double,
     val status: status_enum,
 ) {
-    constructor(_id:Long, _idUser:Long, _address:String, _bablos:Int) :
+    constructor(_id:Long, _idUser:Long, _address:String, _bablos:Double) :
             this(_id, _idUser, null, _address,_bablos, status_enum.NONE)
 }
 

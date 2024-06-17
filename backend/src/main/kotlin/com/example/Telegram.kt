@@ -6,13 +6,12 @@ import com.github.kotlintelegrambot.bot
 import com.github.kotlintelegrambot.dispatch
 import com.github.kotlintelegrambot.dispatcher.text
 import com.github.kotlintelegrambot.entities.*
-import com.github.kotlintelegrambot.entities.User
+import com.github.kotlintelegrambot.network.Response
 import com.github.kotlintelegrambot.network.fold
 
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 
 import kotlinx.coroutines.*
@@ -22,15 +21,9 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlinx.serialization.json.*
 import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.application.*
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 
 
-
-class TelegramBotFactory(){
+class TelegramBotFactory() {
     private var adminBotToken: String? = null
     private var adminBot: Bot? = null
     private var channelMap = hashMapOf<String, HashMap<String, String>>()
@@ -56,8 +49,8 @@ class TelegramBotFactory(){
         }
     }
 
-    private suspend fun initializeAdminBot(){
-        adminBotToken = getAdminTelegram()
+    private suspend fun initializeAdminBot() {
+        adminBotToken = Config.adminBotToken
         adminBot = bot {
             token = adminBotToken.toString()
             dispatch {
@@ -69,8 +62,13 @@ class TelegramBotFactory(){
     }
 
     @OptIn(DelicateCoroutinesApi::class)
-    suspend fun postMessageToChannel(email: String, channelName: String, message: String, date: LocalDateTime): Boolean {
-        val botToken = getTelegram(email) ?: return false
+    suspend fun postMessageToChannel(
+        email: String,
+        channelName: String,
+        message: String,
+        date: LocalDateTime
+    ): Boolean {
+        val botToken = Config.adminBotToken
         // val deferredMessageId = CompletableDeferred<Long?>()
         val bot = bot {
             token = botToken
@@ -94,10 +92,10 @@ class TelegramBotFactory(){
             val result = bot.sendMessage(chatId, message)
 
             result.fold(
-                ifSuccess = {  message ->
+                ifSuccess = { message ->
                     println("Message successfully sent to channel")
                     addPost(email, channelName, message.messageId)
-                   // deferredMessageId.complete(message.messageId)
+                    // deferredMessageId.complete(message.messageId)
                 },
                 ifError = {
                     println("Error sending message to channel: $it")
@@ -131,6 +129,34 @@ class TelegramBotFactory(){
         return chatId
     }
 
+    fun getChannelMemberCount(botToken: String, channelUsername: String): Int? {
+        val bot = bot {
+            token = botToken
+        }
+
+        val chatId = getChannelId(botToken, channelUsername)
+
+        return if (chatId != null) {
+            var memberCount: Int? = null
+            runBlocking {
+                val response = bot.getChatMemberCount(ChatId.fromId(chatId))
+                response.fold(
+                    { result ->
+                        if (result != null) {
+                            memberCount = result.result
+                        }
+                    },
+                    { error ->
+                        println("Error: ${error.errorBody}")
+                    }
+                )
+            }
+            memberCount
+        } else {
+            null
+        }
+    }
+
     fun getBotId(botToken: String): Long? {
         val bot = bot {
             token = botToken
@@ -156,7 +182,7 @@ class TelegramBotFactory(){
 
     private val client = HttpClient {
         install(ContentNegotiation) {
-          json(Json { ignoreUnknownKeys = true })
+            json(Json { ignoreUnknownKeys = true })
         }
     }
 
@@ -166,7 +192,7 @@ class TelegramBotFactory(){
             val botToken = getTelegram(email) ?: return@runBlocking null
             val chatId = getChannelId(botToken, channelUsername) ?: return@runBlocking null
 
-            val response= client.get("https://api.telegram.org/bot$botToken/getMessages") {
+            val response = client.get("https://api.telegram.org/bot$botToken/getMessages") {
                 parameter("channel", chatId)
                 parameter("id", messageId)
             }
@@ -180,122 +206,5 @@ class TelegramBotFactory(){
             null
         }
     }
-
-
-
-//    fun getPosts(botToken: String, channelUsername: String): List<Message> {
-//        val channelId = getChannelId(botToken, channelUsername)
-//        val bot = bot {
-//            token = botToken
-//        }
-//        val botId = getBotId(botToken) ?: return emptyList()
-//        val messages = mutableListOf<Message>()
-//
-//        runBlocking {
-//            var offset: Long? = 0
-//            var shouldContinue = true
-//            while (shouldContinue) {
-//                val result = bot.getUpdates(offset = offset, limit = 100)
-//
-//                result.fold(
-//                    ifSuccess = { updates ->
-//                        val botMessages = updates.mapNotNull { it.message }
-//                     //       .filter { it.chat.id == channelId && it.from?.id == botId }
-//                        messages.addAll(botMessages)
-//
-//                        if (updates.isEmpty()) {
-//                            shouldContinue = false
-//                        } else {
-//                            offset = updates.last().updateId + 1
-//                        }
-//                    },
-//                    ifError = { error ->
-//                        println("Error fetching updates: $error")
-//                        shouldContinue = false
-//                    }
-//                )
-//            }
-//        }
-//
-//        return messages
-//    }
-
-//    fun addBotToChannel(botToken: String, channelId: String): Boolean {
-//        val chatId = ChatId.fromId(channelId.toLong())
-//
-//        // Create the bot instance
-//        val bot = bot {
-//            token = botToken
-//        }
-//        bot.startPolling()
-//
-//        // Get bot user id
-//        val botUser: User = bot.getMe().fold(
-//            ifSuccess = { it },
-//            ifError = {
-//                println("Error getting bot info: $it")
-//                return false
-//            }
-//        )
-//
-//        // Add the bot to the channel as an administrator
-//        val result = adminBot?.promoteChatMember(
-//            chatId = chatId,
-//            userId = botUser.id,
-//            canChangeInfo = true,
-//            canPostMessages = true,
-//            canEditMessages = true,
-//            canDeleteMessages = true,
-//            canInviteUsers = true,
-//            canRestrictMembers = true,
-//            canPinMessages = true,
-//            canPromoteMembers = true
-//        )
-//        bot.stopPolling()
-//
-//        return result?.fold(
-//            ifSuccess = {
-//                println("Bot successfully added as admin")
-//                true
-//            },
-//            ifError = {
-//                println("Error adding bot as admin: $it")
-//                false
-//            }
-//        )
-//            ?: false
-//    }
-
-//    fun addBotToChannel(botToken: String, channelId: String): Boolean {
-//        val chatId = ChatId.fromId(channelId.toLong())
-//
-//        // Получение ссылки приглашения
-//        val inviteLinkResult = adminBot?.createChatInviteLink(chatId)
-//
-//        val inviteLink = inviteLinkResult?.fold(
-//            ifSuccess = { it.inviteLink },
-//            ifError = {
-//                println("Error creating invite link: $it")
-//                null
-//            }
-//        )
-//
-//        inviteLink ?: return false
-//
-//        // Переход по ссылке для добавления бота в канал
-//        return joinChannel(inviteLink, botToken)
-//    }
-//
-//    private fun joinChannel(inviteLink: String, botToken: String): Boolean {
-//        val client = HttpClient.newHttpClient()
-//        val request = HttpRequest.newBuilder()
-//            .uri(URI.create(inviteLink))
-//            .header("Authorization", "Bearer $botToken")
-//            .build()
-//
-//        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-//
-//        return response.statusCode() == 200
-//    }
 
 }

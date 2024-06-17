@@ -36,7 +36,7 @@ class TokenFactory(){
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    private suspend fun getUserRole(email:String):roles_enum{
+    private suspend fun getUserRole(email:String): roles_enum {
         if(isUserAdmin(email)) return roles_enum.ADMIN
         if (isUserIshtar(email)) return roles_enum.ISHTAR
         if (isUserCourier(email)) return roles_enum.COURIER
@@ -91,7 +91,7 @@ class TokenFactory(){
 
     }
 
-    fun hasAccess(accessToken: Token, requiredRole:roles_enum):Boolean{
+    fun hasAccess(accessToken: Token, requiredRole: roles_enum):Boolean{
         return when(getRoleFromToken(accessToken)){
             roles_enum.ADMIN -> true
             roles_enum.ISHTAR -> {

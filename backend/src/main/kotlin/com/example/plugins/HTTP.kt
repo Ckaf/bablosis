@@ -4,6 +4,7 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.cachingheaders.*
+import io.ktor.server.plugins.cors.*
 import io.ktor.server.response.*
 
 fun Application.configureHTTP() {
@@ -14,5 +15,13 @@ fun Application.configureHTTP() {
                 else -> null
             }
         }
+    }
+    install(CORS) {
+        allowMethod(HttpMethod.Options)
+        allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Get)
+        allowHeader(HttpHeaders.AccessControlAllowOrigin)
+        allowHeader(HttpHeaders.ContentType)
+        anyHost() // This allows requests from any host
     }
 }

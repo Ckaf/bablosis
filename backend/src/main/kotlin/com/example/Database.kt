@@ -10,10 +10,11 @@ object DatabaseFactory {
     fun init() {
         val database =
             Database.connect(
-                url = "jdbc:postgresql://localhost:5432/bablosis_db",
-                driver = "org.postgresql.Driver",
-                user = "ckaf",
-                password = "",
+                url = "jdbc:postgresql://80.78.242.22:5432/bablosis",
+               //url = "jdbc:postgresql://localhost/bablosis_db",
+                driver = "org.h2.Driver",
+                user = "postgres",
+                password = "postgres",
             )
     }
     suspend fun <T> dbQuery(block: suspend () -> T): T =
@@ -46,7 +47,7 @@ object Posts : LongIdTable() {
 }
 
 object Balance : Table(){
-    val bablos = integer("bablosis")
+    val bablos = double("bablosis")
     val user_id = reference("user_id", Users)
 }
 
@@ -54,24 +55,25 @@ suspend fun initBalance(userId: Long) {
     DatabaseFactory.dbQuery {
         Balance.insert {
             it[user_id] = EntityID(userId, Users)
-            it[bablos] = 0
+            it[bablos] = 0.0
         }
     }
 }
 
-suspend fun getBalance(userId: Long): Int? {
+suspend fun getBalance(userId: Long): Double? {
     return DatabaseFactory.dbQuery {
         val user = Balance.select { Balance.user_id eq userId }.singleOrNull()
         user?.get(Balance.bablos)
     }
 }
 
-suspend fun changeBalanceToUser(userId: Long, amount: Int) :Boolean{
-    if (getBalance(userId)!! < amount) return false
+suspend fun changeBalanceToUser(userId: Long, amount: Double) :Boolean{
+    if (amount < 0 && (getBalance(userId)!! < -amount))return false
+
     DatabaseFactory.dbQuery {
         Balance.update({ Balance.user_id eq userId }) {
             with(SqlExpressionBuilder) {
-                it.update(Balance.bablos, Balance.bablos + amount)
+                it.update(bablos, bablos + amount)
             }
         }
     }
@@ -80,14 +82,14 @@ suspend fun changeBalanceToUser(userId: Long, amount: Int) :Boolean{
 
 
 object Orders : LongIdTable() {
-    val id_user = Balance.reference("user_id", Users)
-    val id_courier = Balance.reference("user_id", Users).nullable()
+    val id_user = reference("id_user", Users)
+    val id_courier = reference("id_courier", Users).nullable()
     val address = text("address")
-    val bablos = integer("bablos")
+    val bablos = double("bablos")
     val status = text("status")
 }
 
-suspend fun addOrder(userId: Long, courierId: Long?, address: String, bablos: Int, status: String) {
+suspend fun addOrder(userId: Long, courierId: Long?, address: String, bablos: Double, status: String) {
     DatabaseFactory.dbQuery {
         Orders.insert {
             it[id_user] = userId
@@ -252,7 +254,7 @@ suspend fun isUserIshtar(email: String): Boolean {
 suspend fun confirmUser(email: String): Boolean {
     return DatabaseFactory.dbQuery {
         val updatedRows = Users.update({ Users.email eq email }) {
-            it[Users.confirmed] = true
+            it[confirmed] = true
         }
         updatedRows > 0
     }
@@ -261,7 +263,7 @@ suspend fun confirmUser(email: String): Boolean {
 suspend fun setAdmin(email: String): Boolean {
     return DatabaseFactory.dbQuery {
         val updatedRows = Users.update({ Users.email eq email }) {
-            it[Users.isAdmin] = true
+            it[isAdmin] = true
         }
         updatedRows > 0
     }
@@ -269,7 +271,7 @@ suspend fun setAdmin(email: String): Boolean {
 suspend fun setIshtar(email: String): Boolean {
     return DatabaseFactory.dbQuery {
         val updatedRows = Users.update({ Users.email eq email }) {
-            it[Users.isIshtar] = true
+            it[isIshtar] = true
         }
         updatedRows > 0
     }
@@ -278,7 +280,7 @@ suspend fun setIshtar(email: String): Boolean {
 suspend fun setCourier(email: String): Boolean {
     return DatabaseFactory.dbQuery {
         val updatedRows = Users.update({ Users.email eq email }) {
-            it[Users.isCourier] = true
+            it[isCourier] = true
         }
         updatedRows > 0
     }
@@ -287,7 +289,7 @@ suspend fun setCourier(email: String): Boolean {
 suspend fun setTelegram(email: String, tgToken:String): Boolean {
     return DatabaseFactory.dbQuery {
         val updatedRows = Users.update({ Users.email eq email }) {
-            it[Users.telegram] = tgToken
+            it[telegram] = tgToken
         }
         updatedRows > 0
     }

@@ -2,29 +2,23 @@ package com.example
 
 // import io.ktor.features.*
 import com.example.TokenFactory.roles_enum
-import com.example.plugins.*
 import io.ktor.http.*
-import io.ktor.http.content.*
-import io.ktor.serialization.*
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.datetime.*
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
-import kotlin.reflect.jvm.internal.impl.metadata.ProtoBuf.Constructor
-import kotlin.time.Duration.Companion.seconds
-
-
+import com.example.plugins.configureDatabases
+import com.example.plugins.configureHTTP
+import com.example.plugins.configureMonitoring
+import com.example.plugins.configureSecurity
+import io.ktor.server.plugins.cors.*
+import com.typesafe.config.ConfigException.Null
+import io.ktor.server.plugins.cors.CORS
+import io.ktor.server.plugins.cors.routing.*
 
 
 fun main(args: Array<String>) {
@@ -37,10 +31,21 @@ fun Application.module() {
     configureDatabases()
     configureMonitoring()
     configureHTTP()
+    //configureCORS()
     configureSecurity()
     configureRouting()
 }
 
+fun Application.configureCORS() {
+     install(CORS) {
+         allowMethod(HttpMethod.Options)
+         allowMethod(HttpMethod.Post)
+         allowMethod(HttpMethod.Get)
+         allowHeader(HttpHeaders.AccessControlAllowOrigin)
+         allowHeader(HttpHeaders.ContentType)
+         anyHost() // This allows requests from any host
+     }
+}
 
 fun Application.configureSerialization() {
     install(ContentNegotiation) { json() }
@@ -50,7 +55,6 @@ fun Application.configureRouting() {
     val logger = LoggerFactory.getLogger("Application")
     val tf = TokenFactory()
     val tbf = TelegramBotFactory()
-    val proto = MTProto()
 
     routing {
         post("/login") {
@@ -61,6 +65,7 @@ fun Application.configureRouting() {
                 logger.info("Authorization successful for user: $loginData.username")
                     val token = tf.genToken(loginData.email)
                     jsonResponse = buildJsonObject {
+                        put("accessToken", token)
                         put("name", getName(loginData.email))
                         put("role", getUserRole(loginData.email).toString())
                     }.toString()
@@ -124,7 +129,7 @@ fun Application.configureRouting() {
             if(tf.hasAccess(bindData.accessToken, roles_enum.USER)) {
                 setTelegram(tf.getEmailFromToken(bindData.accessToken), bindData.tg)
 
-                logger.info("Telegram token set for user: ${tf.getEmailFromToken(bindData.accessToken)}")
+                logger.info("Telegram channel set for user: ${tf.getEmailFromToken(bindData.accessToken)}")
                 code = HttpStatusCode.OK
             }
             else{
@@ -165,7 +170,7 @@ fun Application.configureRouting() {
             if (tf.hasAccess(data.accessToken, roles_enum.USER)) {
                 val tg = getTelegram(tf.getEmailFromToken(data.accessToken))
                 if (tg != null) {
-                    if (tbf.postMessageToChannel(tg, data.channelId, data.msg, data.date)) {
+                    if (tbf.postMessageToChannel(Config.adminBotToken, tg, data.msg, data.date)) {
                         code = HttpStatusCode.OK
                     } else {
                         jsonResponse = buildJsonObject {
@@ -185,13 +190,28 @@ fun Application.configureRouting() {
 
         }
 
+        post("/get_balance"){
+            var code = HttpStatusCode.Forbidden
+            var jsonResponse = ""
+            val data = call.receive<AccessTokenData>()
+            if (tf.hasAccess(data.accessToken, roles_enum.USER)) {
+                val id = getId(tf.getEmailFromToken(data.accessToken))?.value!!
+                val balance = getBalance(id)
+                jsonResponse = buildJsonObject {
+                    put("balance", balance)
+                }.toString()
+                code = HttpStatusCode.OK
+                }
+            call.respond(code, jsonResponse)
+            }
+
         post("/create_order"){
             var code = HttpStatusCode.Forbidden
             var jsonResponse = ""
             val data = call.receive<OrderCreateData>()
             if (tf.hasAccess(data.accessToken, roles_enum.USER)) {
                 val id = getId(tf.getEmailFromToken(data.accessToken))?.value!!
-                if (changeBalanceToUser(id,data.bablos)) {
+                if (changeBalanceToUser(id,-data.bablos)) {
                     addOrder(id, null, data.address, data.bablos, status_enum.NONE.toString())
                     code = HttpStatusCode.OK
                 }
@@ -296,10 +316,29 @@ fun Application.configureRouting() {
                     putJsonArray("orders") {
                         orders.forEach {
                             addJsonObject {
+                                put("id", it.id)
                                 put("bablos", it.bablos)
                                 put("address", it.address)
                                 put("status", it.status.toString())
                             }
+                        }
+                    }
+                }.toString()
+                code = HttpStatusCode.OK
+            }
+            call.respond(code, jsonResponse)
+        }
+
+        post("/get_my_channels"){
+            var code = HttpStatusCode.Forbidden
+            var jsonResponse = ""
+            val data = call.receive<AccessTokenData>()
+            if (tf.hasAccess(data.accessToken, roles_enum.USER)) {
+                val tg = getTelegram(tf.getEmailFromToken(data.accessToken))
+                jsonResponse = buildJsonObject {
+                    putJsonArray("channels") {
+                        addJsonObject {
+                            put("name", tg)
                         }
                     }
                 }.toString()
@@ -314,8 +353,20 @@ fun Application.configureRouting() {
             val data = call.receive<BablosData>()
             if (tf.hasAccess(data.accessToken, roles_enum.ISHTAR)) {
                 val users = getAllUsers()
-                TODO()
-                users.forEach({})
+                var total_members = 0
+                val list = mutableListOf<Pair<Long, Int>>()
+                users.filter { !(it.isIshtar || it.isAdmin || it.isCourier || !it.confirmed) }
+                    .forEach {
+                        val members = it.telegram?.let { it1 -> tbf.getChannelMemberCount(Config.adminBotToken, it1) }
+                        if (members != null) {
+                            total_members += members - 1
+                            list.add(Pair(it.id, members - 1))
+                        }
+                    }
+                list.forEach{
+                    val bablos = data.bablos * (it.second.toDouble() / total_members.toDouble())
+                    changeBalanceToUser(it.first, bablos)
+                }
 
                 code = HttpStatusCode.OK
             }
@@ -323,20 +374,6 @@ fun Application.configureRouting() {
         }
 
         get("/hello") {
-            // todo drop
-//            val s = 1.seconds
-//            val currentTime = Clock.System.now().plus(s)
-//                .toLocalDateTime(TimeZone.currentSystemDefault())
-//
-//            val time = currentTime
-//
-//            tbf.postMessageToChannel(
-//                "mitra@ya.ru", "glam_disc", "4 msg", time)
-//
-//            val post = tbf.getMessageFromChannel("mitra@ya.ru", "glam_disc", 7)
-//            println(post)
-
-
             call.respondText("Hello world!")
         }
     }
