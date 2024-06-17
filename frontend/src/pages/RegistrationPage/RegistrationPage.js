@@ -34,24 +34,11 @@ export const RegistrationPage = () => {
 	})
 
 	const onSubmit = async data => {
-		console.log(data)
+		// console.log(data)
 		request('/registration', 'POST', data, false).then((userData) => {
-			toast('Заявка на регистрацию отправлена')
-			// login(userData)
-			// 	login({
-			// 		accessToken: "string",
-			// 		accessToken: "string",
-			// 		user: {
-			// 			"id": 1,
-			// 			"login": "test_login",
-			// 			"name": "Максим",
-			// 			"role": {
-			// 				"id": 7,
-			// 				"name": "Разработчик"
-			// 			}
-			// 		}
-			// 	})
-		})
+			toast.success('Заявка на регистрацию отправлена')
+			navigate('/auth')
+		}).catch(() => {})
 	}
 
 	return (

@@ -4,6 +4,7 @@ import {Toaster} from "react-hot-toast"
 import {useAuthContext} from "./context/AuthContext";
 import {useEffect} from "react";
 import {Box, CssVarsProvider} from "@mui/joy";
+import {Header} from "./components";
 
 function App() {
 
@@ -17,13 +18,13 @@ function App() {
 
 
 	return (
-		<Box sx={{display: "flex", flexDirection: 'row', width: '100%'}}>
+		<Box sx={{display: "flex", flexDirection: 'column', width: '100%'}}>
 			<Toaster
 				position="bottom-right"
 				reverseOrder={false}
 			/>
 			<Router>
-				{/*{userData && <Sidebar/>}*/}
+				{userData && <Header/>}
 				<CssVarsProvider>
 					{routes}
 				</CssVarsProvider>

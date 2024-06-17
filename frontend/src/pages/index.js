@@ -1,2 +1,6 @@
 export * from './AuthPage'
 export * from './RegistrationPage'
+export * from './MainMenuPage'
+export * from './UsersPage'
+export * from './OrdersPage'
+export * from './DeliveryPage'

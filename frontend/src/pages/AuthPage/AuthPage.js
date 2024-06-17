@@ -33,22 +33,15 @@ export const AuthPage = () => {
 	})
 
 	const onSubmit = async data => {
-		console.log(data)
+		// console.log(data)
 		request('/login', 'POST', data, false).then((userData) => {
-			// login(userData)
-			login({
-				accessToken: "string",
-				user: {
-					"id": 1,
-					"email": "email@email.com",
-					"name": "Максим",
-					"role": {
-						"id": 7,
-						"name": "Разработчик"
-					}
-				}
-			})
-		})
+			if (userData) {
+				login({
+					accessToken: userData.accessToken,
+					user: userData,
+				})
+			}
+		}).catch(() => {})
 	}
 
 	return (
